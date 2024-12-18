@@ -1,0 +1,271 @@
+
+`timescale 1ns / 1ps
+
+module VotingMachine1(
+  input clock,
+  input reset,
+  input mode,
+  input button1,
+  input button2,
+  input button3,
+  input pollsig,
+  input [7:0] voter_id,
+  output already_voted,
+  output pollsigON,
+  output decimal_point0,
+  output decimal_point1,
+  output [6:0] digit0,
+  output [6:0] digit1
+);
+
+  assign decimal_point0 = 1;
+  assign decimal_point1 = 1;
+
+  wire valid_vote_1;
+  wire valid_vote_2;
+  wire valid_vote_3;
+  wire [6:0] cand1_vote_recvd;
+  wire [6:0] cand2_vote_recvd;
+  wire [6:0] cand3_vote_recvd;
+  wire [255:0] voted;
+  wire anyValidVote;
+
+  assign pollsigON = ~(~pollsig & mode);
+  assign already_voted = ~(voted[voter_id] & mode);
+  assign anyValidVote = valid_vote_1 | valid_vote_2 | valid_vote_3;
+
+  buttonControl bc1(
+    .clock(clock),
+    .reset(reset),
+    .button(button1),
+    .mode(~mode),
+    .pollsig(~pollsig),
+    .voter_id(voter_id),
+    .voted(voted),
+    .valid_vote(valid_vote_1)
+  );
+
+  buttonControl bc2(
+    .clock(clock),
+    .reset(reset),
+    .button(button2),
+    .mode(~mode),
+    .pollsig(~pollsig),
+    .voter_id(voter_id),
+    .voted(voted),
+    .valid_vote(valid_vote_2)
+  );
+
+  buttonControl bc3(
+    .clock(clock),
+    .reset(reset),
+    .button(button3),
+    .mode(~mode),
+    .pollsig(~pollsig),
+    .voter_id(voter_id),
+    .voted(voted),
+    .valid_vote(valid_vote_3)
+  );
+
+  authentication auth(
+    .clock(clock),
+    .reset(reset),
+    .anyValidVote(anyValidVote),
+    .voter_id(voter_id),
+    .voted(voted)
+  );
+
+  voteLogger VL(
+    .clock(clock),
+    .reset(reset),
+    .mode(~mode),
+    .cand1_vote_valid(valid_vote_1),
+    .cand2_vote_valid(valid_vote_2),
+    .cand3_vote_valid(valid_vote_3),
+    .cand1_vote_recvd(cand1_vote_recvd),
+    .cand2_vote_recvd(cand2_vote_recvd),
+    .cand3_vote_recvd(cand3_vote_recvd)
+  );
+
+  modeControl MC(
+    .clock(clock),
+    .reset(reset),
+    .mode(~mode),
+    .valid_vote_casted(anyValidVote),
+    .candidate1_vote(cand1_vote_recvd),
+    .candidate2_vote(cand2_vote_recvd),
+    .candidate3_vote(cand3_vote_recvd),
+    .candidate1_button_press(~button1),
+    .candidate2_button_press(~button2),
+    .candidate3_button_press(~button3),
+    .digit0(digit0),
+    .digit1(digit1)
+  );
+
+endmodule
+
+`timescale 1ns / 1ps
+
+module authentication(
+  input clock,
+  input reset,
+  input anyValidVote,
+  input [7:0] voter_id,
+  output reg [255:0] voted
+);
+
+  always @(posedge clock) begin
+    if (reset)
+      voted = 0;
+    else if (anyValidVote)
+      voted[voter_id] = 1;
+  end
+
+endmodule
+
+`timescale 1ns / 1ps
+
+module voteLogger(
+  input clock,
+  input reset,
+  input mode,
+  input cand1_vote_valid,
+  input cand2_vote_valid,
+  input cand3_vote_valid,
+  output reg [6:0] cand1_vote_recvd,
+  output reg [6:0] cand2_vote_recvd,
+  output reg [6:0] cand3_vote_recvd
+);
+
+  always @(posedge clock) begin
+    if (reset) begin
+      cand1_vote_recvd <= 0;
+      cand2_vote_recvd <= 0;
+      cand3_vote_recvd <= 0;
+    end else if (~mode) begin
+      if (cand1_vote_valid)
+        cand1_vote_recvd = cand1_vote_recvd + 1;
+      else if (cand2_vote_valid)
+        cand2_vote_recvd = cand2_vote_recvd + 1;
+      else if (cand3_vote_valid)
+        cand3_vote_recvd = cand3_vote_recvd + 1;
+    end
+  end
+
+endmodule
+
+`timescale 1ns / 1ps
+
+module buttonControl(
+  input clock,
+  input reset,
+  input button,
+  input mode,
+  input pollsig,
+  input [7:0] voter_id,
+  input [255:0] voted,
+  output reg valid_vote
+);
+
+  reg [24:0] counter;
+
+  always @(posedge clock) begin
+    if (reset | mode | ~pollsig)
+      counter = 0;
+    else begin
+      if (button & counter < 25000001)
+        counter = counter + 1;
+      else if (!button)
+        counter = 0;
+    end
+  end
+
+  always @(posedge clock) begin
+    if (reset)
+      valid_vote = 1'b0;
+    else begin
+      if (counter == 25000000 & ~voted[voter_id])
+        valid_vote = 1'b1;
+      else
+        valid_vote = 1'b0;
+    end
+  end
+
+endmodule
+
+`timescale 1ns / 1ps
+
+module modeControl(
+  input clock,
+  input reset,
+  input mode,
+  input valid_vote_casted,
+  input [6:0] candidate1_vote,
+  input [6:0] candidate2_vote,
+  input [6:0] candidate3_vote,
+  input candidate1_button_press,
+  input candidate2_button_press,
+  input candidate3_button_press,
+  output [6:0] digit0,
+  output [6:0] digit1
+);
+
+  reg [6:0] num;
+  initial num = 100;
+
+  // Mode 0 -> voting mode, mode 1 -> result mode
+  always @(posedge clock) begin
+    if (reset) begin
+      num = 0;
+    end else begin
+      if (~mode) // mode = 0 -> voting mode
+        num = 100; // No digits displayed
+      else begin // mode = 1 -> result mode
+        if (candidate1_button_press)
+          num = candidate1_vote;
+        else if (candidate2_button_press)
+          num = candidate2_vote;
+        else if (candidate3_button_press)
+          num = candidate3_vote;
+      end
+    end
+  end
+
+  digitsDisplay display_votes(.num(num), .digit0(digit0), .digit1(digit1));
+
+endmodule
+
+`timescale 1ns / 1ps
+
+module digitsDisplay(
+  input [6:0] num,
+  output reg [6:0] digit0,
+  output reg [6:0] digit1
+);
+
+  wire [6:0] segment_data[0:9];
+
+  // Define 7-segment patterns for digits 0 to 9
+  assign segment_data[0] = 7'b0000001; // 0
+  assign segment_data[1] = 7'b1001111; // 1
+  assign segment_data[2] = 7'b0010010; // 2
+  assign segment_data[3] = 7'b0000110; // 3
+  assign segment_data[4] = 7'b1001100; // 4
+  assign segment_data[5] = 7'b0100100; // 5
+  assign segment_data[6] = 7'b0100000; // 6
+  assign segment_data[7] = 7'b0001111; // 7
+  assign segment_data[8] = 7'b0000000; // 8
+  assign segment_data[9] = 7'b0000100; // 9
+
+  // Display the number
+  always @(*) begin
+    if (num >= 0 && num <= 99) begin
+      digit1 = segment_data[num / 10];
+      digit0 = segment_data[num % 10];
+    end else begin
+      digit0 = 7'b1111111;
+      digit1 = 7'b1111111;
+    end
+  end
+
+endmodule
