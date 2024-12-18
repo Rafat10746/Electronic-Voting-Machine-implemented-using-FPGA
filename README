@@ -1,0 +1,36 @@
+Name of the project: Digital Voting Machine Using Verilog
+
+The project aims to design and implement a secure digital voting system using Verilog HDL
+(Hardware Description Language). This system will simulate a voting process where each voter
+can securely cast their vote, ensuring data integrity, voter anonymity, and real-time vote
+counting. By leveraging Verilog, the system can be synthesized into hardware components like
+FPGAs (Field-Programmable Gate Arrays), making it efficient and reliable for real-world
+applications.
+
+Scope of the Project:
+•Design and Simulation: The voting system will be designed using Verilog HDL and
+simulated using software like quartus to verify functionality.
+•Hardware Implementation: Once the design is verified, it will be implemented on an
+FPGA board for practical testing.
+
+System Overview:
+1. Voter Registration Module: This module allows voters to input their unique voter ID to
+ensure only authorized individuals can cast votes.
+2. Voting Module: This allows the voter to select a candidate from a list and cast a vote.
+Once cast, the vote is recorded, and the voter cannot vote again.
+Vote Counting Module: This module counts votes in real-time and displays the results
+after voting ends.
+3. Result Display Module: This will display the number of votes for each candidate after
+the voting process.
+
+Hardware Components:
+1. FPGA Board (e.g., Xilinx or Altera): The core platform where the Verilog code will be
+synthesized and the voting system will be implemented.
+2. Input Devices:
+   o Keypad: For voters to enter their ID and cast their vote.
+   o Push Buttons: To simulate vote submission.
+   Display Devices:
+   o LEDs or 7-Segment Display: To indicate the voting results.
+   o LCD Display: For more detailed result output.
+   Memory Unit (EEPROM or SRAM): To store voter IDs and votes securely.
+   Clock Generator: To provide timing control for the system operations.
